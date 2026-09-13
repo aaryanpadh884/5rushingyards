@@ -66,6 +66,7 @@ def page_rankings():
 
     display_cols = [
         "rank", "player_name", "team", "opponent", "model_probability",
+        "games_with_carry", "games_with_5plus",
         "sportsbook_odds", "sportsbook_implied_probability", "edge", "fair_odds",
         "confidence", "bet_category",
     ]

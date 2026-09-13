@@ -21,7 +21,7 @@ DISPLAY_COLUMNS = [
     "confidence", "bet_category",
     "first_drive_run_pct", "avg_carry_share", "p_carry_1plus_shrunk",
     "total_carries", "total_rushing_yards", "opp_five_plus_allowed_rate",
-    "games_with_carry", "role", "status", "role_note", "odds_available",
+    "games_with_carry", "games_with_5plus", "role", "status", "role_note", "odds_available",
     "expected_value_per_100", "current_role_source",
 ]
 

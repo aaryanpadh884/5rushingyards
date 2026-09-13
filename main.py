@@ -122,6 +122,7 @@ def cmd_rankings(args):
     print(f"Wrote {len(ranked)} ranked candidates -> {config.RANKINGS_OUT}")
     print(f"\n=== Filter: {args.filter} ({len(filtered)} rows) ===")
     display_cols = ["rank", "player_name", "team", "opponent", "model_probability",
+                     "games_with_carry", "games_with_5plus",
                      "sportsbook_odds", "sportsbook_implied_probability", "edge",
                      "fair_odds", "confidence", "bet_category"]
     display_cols = [c for c in display_cols if c in filtered.columns]
