@@ -157,14 +157,15 @@ def load_player_positions(force_download: bool = False, timeout: int = 120) -> p
     """
     Download (once, cached) the nflverse players roster file and return a
     DataFrame of [player_id, player_name, position, position_group,
-    latest_team] keyed by `gsis_id`, which is the same ID space as
-    `rusher_player_id` in the play-by-play data.
+    latest_team, last_season] keyed by `gsis_id`, which is the same ID
+    space as `rusher_player_id` in the play-by-play data.
 
-    `latest_team` reflects the roster file's live snapshot at download
-    time -- it is what lets the live rankings pipeline know a player has
-    changed teams since the historical play-by-play was recorded. It must
-    NOT be used inside the backtest (see
-    rb_analysis.compute_departed_teammate_boost's docstring for why).
+    `latest_team` and `last_season` reflect the roster file's live snapshot
+    at download time -- they are what let the live rankings pipeline know
+    a player has changed teams, or left the league entirely, since the
+    historical play-by-play was recorded. Neither must be used inside the
+    backtest (see rb_analysis.compute_departed_teammate_boost's docstring
+    for why).
     """
     dest = config.RAW_DATA_DIR / "players.parquet"
     if not dest.exists() or force_download:
@@ -182,6 +183,7 @@ def load_player_positions(force_download: bool = False, timeout: int = 120) -> p
             "the nflverse players schema may have changed."
         )
     cols = ["player_id", "player_name", "position", "position_group"]
-    if "latest_team" in players.columns:
-        cols.append("latest_team")
+    for optional_col in ["latest_team", "last_season"]:
+        if optional_col in players.columns:
+            cols.append(optional_col)
     return players.rename(columns={"gsis_id": "player_id", "display_name": "player_name"})[cols]

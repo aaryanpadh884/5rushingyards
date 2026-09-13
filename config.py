@@ -41,6 +41,12 @@ NFLVERSE_PBP_URL_TEMPLATE = (
 
 DEFAULT_SEASONS = [2024, 2025]
 
+# The season the live rankings pipeline is projecting for. Used to filter
+# out historical RBs who are no longer on an active NFL roster (per the
+# nflverse players feed's `last_season` field) before they can show up as
+# a live candidate under their old team.
+CURRENT_SEASON = 2026
+
 # ---------------------------------------------------------------------------
 # Target definition
 # ---------------------------------------------------------------------------

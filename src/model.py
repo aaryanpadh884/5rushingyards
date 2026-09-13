@@ -165,6 +165,29 @@ def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
     )
     df["team"] = df["team"].fillna(df["historical_team"])
 
+    # Drop historical RBs who are no longer on an active NFL roster (per
+    # nflverse's `last_season` field) and have no explicit current_roles
+    # entry. Without this, a player with real 2024-2025 usage but who
+    # retired, was released, or is on reserve/suspended (e.g. last_season
+    # short of config.CURRENT_SEASON) would otherwise keep showing up as a
+    # live candidate under his old team forever, purely because "no
+    # current-role entry" falls back to his historical team rather than
+    # checking whether he's still in the league. A manual current_roles
+    # entry always overrides this check (role.notna()), so you can force a
+    # specific player back in if the roster feed is behind reality.
+    if players is not None and "last_season" in players.columns:
+        last_season_lookup = players.set_index("player_id")["last_season"]
+        df["_last_season"] = df["player_id"].map(last_season_lookup)
+        is_inactive = df["_last_season"].notna() & (df["_last_season"] < config.CURRENT_SEASON)
+        has_manual_override = df["role"].notna()
+        dropped = int((is_inactive & ~has_manual_override).sum())
+        if dropped:
+            logger.info(
+                "dropping %d player(s) with no current 2026 roster spot (last_season < %s) "
+                "and no current_rb_roles.csv override", dropped, config.CURRENT_SEASON,
+            )
+        df = df[~(is_inactive & ~has_manual_override)].drop(columns=["_last_season"])
+
     if players is not None:
         from src.rb_analysis import compute_departed_teammate_boost
         boost_table = compute_departed_teammate_boost(rb_metrics, players, config.DEPARTED_TEAMMATE_MAX_BOOST)

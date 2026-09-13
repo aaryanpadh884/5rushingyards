@@ -163,6 +163,24 @@ was traded inherits a *new* team's committee dynamics that his own
 historical rate says nothing about; that mismatch is a separate, documented
 limitation, not something this boost tries to fix.
 
+## Filtering out players no longer in the league
+
+A related gap: a player with real 2024-2025 usage but no entry in
+`data/current_rb_roles.csv` used to default to showing up forever under his
+old historical team, with no check on whether he's still active. Example:
+Joe Mixon has real Houston history in the loaded seasons, but the live
+nflverse roster feed shows his `last_season` as 2025 (reserve/suspended
+status) -- he is not on Houston's active 2026 roster, yet the model kept
+ranking him as a live HOU candidate purely because nothing said otherwise.
+
+`build_model_table` now drops any historical RB whose `last_season` (from
+the live players roster) is behind `config.CURRENT_SEASON` **and** who has
+no explicit `current_rb_roles.csv` entry. A manual roles-file entry always
+overrides this -- if you know the roster feed is behind reality for a
+specific player, add him to the CSV and he's back in regardless of what
+`last_season` says. Like the departed-teammate boost, this only runs when
+`players` is passed in, so it never touches the backtest.
+
 ## Adding sportsbook odds
 
 `data/sportsbook_odds.csv` (columns: `player_name,team,market,line,american_odds,sportsbook,timestamp`).
