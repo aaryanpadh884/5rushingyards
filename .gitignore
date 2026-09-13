@@ -10,3 +10,7 @@ data/processed/*
 
 .DS_Store
 *.egg-info/
+
+# Snapshot of the previous roles file, written automatically by
+# `derive-rb-roles` before it overwrites data/current_rb_roles.csv.
+data/current_rb_roles.before_derivation.csv

@@ -118,4 +118,13 @@ ROLE_CARRY_MULTIPLIER = {
 
 CURRENT_ROLE_SOURCE = "data/current_rb_roles.csv"
 
+# ---------------------------------------------------------------------------
+# Data-derived role inference (src/roles.py). Replaces hand-picked RB1/RB2/
+# committee judgment calls with a rule based on real current-roster
+# membership and real historical carry-volume share between a team's top
+# two backs.
+# ---------------------------------------------------------------------------
+ROLE_INFERENCE_RB1_SHARE_THRESHOLD = 0.60   # top back needs >=60% of the pair's volume to be a clear RB1
+ROLE_INFERENCE_COMMITTEE_SHARE_THRESHOLD = 0.30  # both backs need >=30% each to be called a committee
+
 RANDOM_SEED = 42

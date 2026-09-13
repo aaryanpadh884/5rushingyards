@@ -109,22 +109,60 @@ Critically, this file also resolves **which team a player is on now** --
 if a player was traded or signed elsewhere in the offseason, his historical
 play-by-play team is stale, and the model uses this file's team to look up
 his real Week 1 opponent, current team's run rate, and that opponent's
-defense. Without an entry, the player falls back to his historical team and
-is flagged `"no current-role entry; using historical rate only"`.
+defense. Without an entry, the player falls back to his historical team, is
+checked against `last_season` (see below), and is flagged
+`"no current-role entry; using historical rate only"`.
 
-**To update it:** edit the CSV directly, one row per player. Remove a
-player entirely if they're not part of your relevant slate, or set
-`status=out` to keep them in the table but zero their probability.
+### Generating it from data instead of guessing
 
-The seed file included here was cross-checked against the live
-nflverse players roster feed (`latest_team` field) to catch known 2026
-offseason moves (e.g. Isiah Pacheco to DET, David Montgomery to HOU,
-Kenneth Walker III to KC, Travis Etienne to NO, Rachaad White to WAS, Najee
-Harris to NYG, Rico Dowdle to PIT). It reflects a best-effort snapshot as of
-build time, not a live feed -- **verify and update it weekly** before
-relying on it; this sandbox's outbound network access does not reach
-fantasy/depth-chart sites (ESPN, CBS Sports, RotoWire, etc.) to auto-verify
-beyond the nflverse roster data.
+```bash
+python main.py derive-rb-roles
+```
+
+This **replaces hand-picked RB1/RB2/committee judgment calls with a rule
+derived from real data** (`src/roles.py`):
+
+1. Take each team's actual current roster of RBs (nflverse players feed,
+   `position_group == "RB"` and `last_season == config.CURRENT_SEASON`).
+2. Rank them by career first-drive carry volume (`total_carries`, wherever
+   he earned it -- a traded veteran's volume at his old team is an
+   imperfect but real signal of how much a team trusts him).
+3. One back with >=60% of the top-two's combined volume -> clear RB1/RB2.
+   Both with >=30% each -> `committee`. Thresholds are
+   `config.ROLE_INFERENCE_RB1_SHARE_THRESHOLD` /
+   `..._COMMITTEE_SHARE_THRESHOLD`.
+4. A player with **zero** historical carries anywhere (a true rookie who
+   entered the league this year) gets **no role at all** -- guessing one
+   would be exactly the kind of invented number this project refuses to
+   produce. The command logs every such player so you can add them by hand
+   if you have reason to believe otherwise.
+
+It automatically backs up whatever was in `current_rb_roles.csv` to
+`current_rb_roles.before_derivation.csv` first, and prints which teams'
+top-two changed. It's part of `full-pipeline` by default.
+
+**What it does NOT do:** there's no injury feed wired in, so every derived
+row defaults to `status=active`. Questionable/injured/out designations
+still require manually editing the CSV after generation -- and if you
+believe the data is wrong for a specific player (a rookie you expect to
+start Week 1, a role change the roster feed hasn't caught up to yet), edit
+the row by hand; a manual edit is never overwritten except by re-running
+`derive-rb-roles` again.
+
+This must never run inside the backtest -- `last_season`/`latest_team` are
+live snapshots, so deriving "today's" roles and applying them to a past
+season would leak future information into a historical prediction
+(confirmed: backtest metrics are identical before/after this feature).
+
+The seed file originally shipped with this repo was a hand-picked,
+best-effort snapshot cross-checked against the live nflverse roster feed.
+Running `derive-rb-roles` replaces it with a repeatable, data-driven
+version -- e.g. it correctly demoted several of the original manual picks
+once real carry-share data disagreed (Jacksonville's actual leading backs
+turned out to be Chris Rodriguez Jr./Ameer Abdullah, not the rookies I'd
+guessed; New York Giants' Cam Skattebo ranked below Najee Harris in real
+volume; the Chargers' Omarion Hampton and Kimani Vidal split closely enough
+to be a real `committee`, not a clean RB1/RB2).
 
 ## Departed-teammate carry boost
 
@@ -259,6 +297,7 @@ pip install -r requirements.txt
 python main.py download-data                 # cache 2024/2025 pbp + player roster
 python main.py build-first-drives             # identify each team's first offensive drive
 python main.py calculate-rb-metrics           # team/RB/defense first-drive metrics -> data/processed/
+python main.py derive-rb-roles                # regenerate current_rb_roles.csv from real carry-share data
 python main.py rankings --filter best_bets    # build Week 1 rankings (all|best_bets|high_probability|best_value|passes)
 python main.py backtest                       # walk-forward backtest + calibration
 python main.py full-pipeline                  # everything above, end to end
