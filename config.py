@@ -50,7 +50,7 @@ CURRENT_SEASON = 2026
 # ---------------------------------------------------------------------------
 # Target definition
 # ---------------------------------------------------------------------------
-BIG_RUN_THRESHOLD_YARDS = 5  # the market: >=1 individual rush of this many yards
+BIG_RUN_THRESHOLD_YARDS = 5  # the market: total rushing yards on the first drive >= this many
 
 # ---------------------------------------------------------------------------
 # Historical weighting (Section 11)
@@ -85,6 +85,26 @@ MIN_EDGE = 0.03
 # ---------------------------------------------------------------------------
 CONFIDENCE_HIGH_SAMPLE = 16
 CONFIDENCE_MED_SAMPLE = 8
+
+# ---------------------------------------------------------------------------
+# Composite opponent run-defense adjustment (Section 17). Combines every
+# first-drive run-defense signal computed in matchup_analysis.py into one
+# bounded multiplier, instead of using only the 5+ allowed rate in
+# isolation. Each metric is standardized (z-score vs league average for
+# that metric) and combined with these weights (must sum to 1.0); the
+# combined z-score is then scaled and clipped into a multiplier applied to
+# P(5+ | carry).
+# ---------------------------------------------------------------------------
+DEFENSE_FACTOR_WEIGHTS = {
+    "five_plus_allowed_rate_shrunk": 0.40,  # direct analog of the target metric
+    "yards_per_rush_allowed": 0.25,
+    "ten_plus_allowed_rate": 0.15,
+    "success_rate_allowed": 0.10,
+    "avg_epa_allowed": 0.10,
+}
+DEFENSE_COMPOSITE_SCALE = 0.15   # how much a 1-standard-deviation composite z-score shifts the multiplier
+DEFENSE_ADJUSTMENT_MIN_FACTOR = 0.70
+DEFENSE_ADJUSTMENT_MAX_FACTOR = 1.30
 
 # ---------------------------------------------------------------------------
 # QB rush competition adjustment (Section 19) — small negative multiplier

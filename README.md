@@ -66,16 +66,28 @@ aggregates (a sack has no rusher).
 
 ## The 5+ rule
 
-The market is: *did the RB have at least one individual rushing attempt of
-5+ yards on the first drive* -- **not** whether his carries summed to 5+.
+The market is: *did the RB's total rushing yards on the first drive add up
+to 5+* -- a standard accumulated-total prop, same as any other rushing-yards
+Over/Under, evaluated over just the first drive.
 
 ```
-[2, 3, 4, 4]  -> False  (no single carry reaches 5)
-[2, 6]        -> True   (one carry of 6)
+[2, 3, 4]     -> True   (sums to 9)
+[1, 1]        -> False  (sums to 2)
+[2, 6]        -> True   (sums to 8)
 ```
 
-Implemented as `src.utils.got_five_plus()`, which takes the max of the
-individual carries, not the sum.
+Implemented as `src.utils.got_five_plus()`, which sums the individual
+carries.
+
+**Revision note:** an earlier version of this project used a different rule
+-- true only if a single individual carry reached 5+ yards, false no matter
+how the total added up. That was changed after confirming what a real
+"X+ rushing yards on the first drive" sportsbook prop actually measures.
+The switch is a meaningful behavior change, not a tweak: hit rates jump
+substantially across the board, since a back who gets 2-3 carries on a
+drive clears "5 total yards" far more often than he breaks one specific
+5+ yard run. Every historical rate, and the whole backtest, was recomputed
+under the new definition -- nothing here is a mix of the two rules.
 
 ## Historical weighting & shrinkage
 
@@ -94,6 +106,36 @@ individual carries, not the sum.
   A rookie with 1 game and a single 5+ run does **not** get scored as a
   100% lock -- his rate is dominated by the prior until he accumulates a
   real sample (`config.PRIOR_STRENGTH_*` controls how fast that happens).
+
+## Opponent defense adjustment
+
+`matchup_analysis.py` computes five separate first-drive run-defense
+signals per team: 5+ allowed rate, yards per rush allowed, 10+ allowed
+rate, success rate allowed, and average EPA allowed. All five are combined
+into one **composite** adjustment (`compute_composite_defense_factor`)
+rather than using the 5+ allowed rate on its own:
+
+1. Each metric is standardized against the league (z-score: how many
+   standard deviations above/below average that defense is on that one
+   metric). All five point the same direction -- higher always means a
+   softer defense -- so no sign flips are needed.
+2. The five z-scores are combined with fixed weights
+   (`config.DEFENSE_FACTOR_WEIGHTS`, summing to 1.0 -- 40% on the 5+
+   allowed rate since it's the closest direct analog of the target,
+   25% yards per rush, 15% explosive-run rate, 10% each on success
+   rate/EPA).
+3. The combined score is scaled (`config.DEFENSE_COMPOSITE_SCALE`) and
+   clipped to `[DEFENSE_ADJUSTMENT_MIN_FACTOR, DEFENSE_ADJUSTMENT_MAX_FACTOR]`
+   (0.70x-1.30x by default), then multiplied into the player's own
+   conditional `P(5+ | carry)`.
+
+The cap matters more here than in a single-metric version: five real but
+noisy signals combined could otherwise compound into an extreme swing for
+a defense that happens to be bad on all five in a small sample. The clip
+keeps a single opponent read from ever dominating the player's own
+established rate. All five raw metrics are still visible in
+`defense_first_drive_metrics.csv` even though only the composite factor
+feeds the model.
 
 ## Current RB roles
 

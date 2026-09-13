@@ -1,15 +1,16 @@
 """
 RB-level first-drive rushing metrics (Sections 7-12, 34).
 
-MARKET DEFINITION (Sections 7, 34) — this is the single most important rule
-in this module:
+MARKET DEFINITION — this is the single most important rule in this module:
 
-    "RB records >=5 rushing yards on first drive" means the RB had AT LEAST
-    ONE INDIVIDUAL rushing attempt of 5+ yards during the team's first
-    offensive drive. It is NOT the sum of all his carries on the drive.
+    "RB records >=5 rushing yards on first drive" means the SUM of all his
+    rushing attempts on the team's first offensive drive is >= 5. It is a
+    standard accumulated-total yardage prop (same as any rushing-yards
+    Over/Under), not a "did he break one specific big run" prop.
 
-    [2, 3, 4, 4] -> does NOT qualify (max single carry = 4)
-    [2, 6]       -> DOES qualify (one carry of 6)
+    [2, 3, 4, 4] -> DOES qualify (sums to 13)
+    [2, 6]       -> DOES qualify (sums to 8)
+    [1, 1]       -> does NOT qualify (sums to 2)
 
 RB IDENTIFICATION: rushing plays are attributed to `rusher_player_id`
 (gsis_id). We restrict to players whose `position_group == "RB"` in the

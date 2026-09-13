@@ -125,6 +125,50 @@ def blend_defense_seasons(defense_metrics_shrunk: pd.DataFrame, season_weights: 
     return pd.DataFrame(rows)
 
 
+def compute_composite_defense_factor(defense_metrics: pd.DataFrame,
+                                      weights: Optional[dict] = None) -> pd.DataFrame:
+    """
+    Combine every first-drive run-defense signal (5+ allowed rate, yards
+    per rush allowed, 10+ allowed rate, success rate allowed, EPA allowed)
+    into one bounded multiplier, instead of using the 5+ allowed rate in
+    isolation.
+
+    Each metric is standardized against the league (z-score: how many
+    standard deviations above/below league average that defense is on that
+    metric -- all five metrics point the same direction, higher = softer
+    defense, so no sign flips are needed). The standardized scores are
+    combined with `config.DEFENSE_FACTOR_WEIGHTS` (must sum to 1.0), scaled
+    by `config.DEFENSE_COMPOSITE_SCALE`, and clipped to
+    [DEFENSE_ADJUSTMENT_MIN_FACTOR, DEFENSE_ADJUSTMENT_MAX_FACTOR] so no
+    single noisy metric (or a defense that's extreme on all five) can swing
+    a player's probability further than that cap allows.
+
+    A team missing a given metric contributes 0 (league-average) for that
+    metric rather than being dropped, so a small amount of missing data in
+    one column doesn't zero out the whole composite.
+    """
+    weights = dict(weights or config.DEFENSE_FACTOR_WEIGHTS)
+    if abs(sum(weights.values()) - 1.0) > 1e-6:
+        raise ValueError(f"DEFENSE_FACTOR_WEIGHTS must sum to 1.0, got {sum(weights.values())}")
+
+    df = defense_metrics.copy()
+    composite_z = pd.Series(0.0, index=df.index)
+
+    for col, weight in weights.items():
+        if col not in df.columns:
+            continue
+        values = df[col]
+        mean, std = values.mean(), values.std()
+        z = (values - mean) / std if std and pd.notna(std) and std != 0 else pd.Series(0.0, index=df.index)
+        composite_z = composite_z + z.fillna(0.0) * weight
+
+    df["composite_defense_z"] = composite_z
+    df["composite_defense_factor"] = (1 + composite_z * config.DEFENSE_COMPOSITE_SCALE).clip(
+        config.DEFENSE_ADJUSTMENT_MIN_FACTOR, config.DEFENSE_ADJUSTMENT_MAX_FACTOR
+    )
+    return df[["team", "composite_defense_z", "composite_defense_factor"]]
+
+
 # ---------------------------------------------------------------------------
 # QB rushing competition (Section 19)
 # ---------------------------------------------------------------------------
@@ -166,6 +210,9 @@ def build_defense_and_qb_metrics(first_drive_plays: pd.DataFrame) -> dict:
     defense_raw = compute_defense_first_drive_metrics(first_drive_plays)
     defense_shrunk = apply_defense_shrinkage(defense_raw)
     defense_blended = blend_defense_seasons(defense_shrunk, config.SEASON_WEIGHTS)
+
+    composite = compute_composite_defense_factor(defense_blended)
+    defense_blended = defense_blended.merge(composite, on="team", how="left")
 
     qb_competition = compute_qb_rush_competition(first_drive_plays)
 

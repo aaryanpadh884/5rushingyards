@@ -34,7 +34,11 @@ def _team_metrics_row(team):
 
 
 def _defense_row(team):
-    return {"team": team, "five_plus_allowed_rate_shrunk": 0.5, "yards_per_rush_allowed": 4.5, "games": 30}
+    return {
+        "team": team, "five_plus_allowed_rate_shrunk": 0.5, "yards_per_rush_allowed": 4.5,
+        "ten_plus_allowed_rate": 0.2, "success_rate_allowed": 0.45, "avg_epa_allowed": 0.0,
+        "composite_defense_factor": 1.0, "games": 30,
+    }
 
 
 class TestInactivePlayerFilter:

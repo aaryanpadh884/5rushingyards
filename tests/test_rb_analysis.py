@@ -1,5 +1,5 @@
-"""Unit tests for src/rb_analysis.py (Section 41): RB carry share and the
-individual-carry 5+ rule as applied through the real aggregation pipeline."""
+"""Unit tests for src/rb_analysis.py: RB carry share and the total-yards
+5+ rule as applied through the real aggregation pipeline."""
 
 import sys
 from pathlib import Path
@@ -64,15 +64,23 @@ class TestCarryShare:
 
 
 class TestFivePlusFlagInAggregation:
-    def test_got_5plus_true_when_one_big_carry(self):
-        # Section 34 example: [2, 3, 4, 4] does NOT qualify
+    """got_5plus is a total-accumulated-yards market: [2, 3, 4, 4] sums to
+    13 and DOES qualify, even though no single carry reached 5."""
+
+    def test_got_5plus_true_when_carries_sum_past_threshold(self):
         fd = pd.DataFrame([_row("00-001", 2), _row("00-001", 3), _row("00-001", 4), _row("00-001", 4)])
+        fd_pos = attach_rb_positions(fd, PLAYERS)
+        per_player_game = compute_team_game_rb_carries(fd_pos)
+        assert per_player_game.iloc[0]["got_5plus"] == True
+
+    def test_got_5plus_false_when_carries_sum_below_threshold(self):
+        fd = pd.DataFrame([_row("00-001", 1), _row("00-001", 1)])
         fd_pos = attach_rb_positions(fd, PLAYERS)
         per_player_game = compute_team_game_rb_carries(fd_pos)
         assert per_player_game.iloc[0]["got_5plus"] == False
 
     def test_got_5plus_true_with_single_qualifying_carry(self):
-        # [2, 6] DOES qualify
+        # [2, 6] sums to 8 -> qualifies
         fd = pd.DataFrame([_row("00-001", 2), _row("00-001", 6)])
         fd_pos = attach_rb_positions(fd, PLAYERS)
         per_player_game = compute_team_game_rb_carries(fd_pos)

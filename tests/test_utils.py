@@ -108,24 +108,29 @@ class TestShrinkage:
 
 
 class TestFivePlusDetection:
-    def test_exact_spec_example_qualifies(self):
-        # 2-yard rush + 4-yard rush + 7-yard rush -> got_5_plus = True
-        assert got_five_plus([2, 4, 7]) is True
+    """
+    got_five_plus is the market rule: total accumulated rushing yards on
+    the first drive, an Over/Under-style prop -- NOT whether any single
+    carry individually reached the threshold.
+    """
 
-    def test_exact_spec_example_does_not_qualify(self):
-        # 2-yard rush + 3-yard rush + 4-yard rush -> got_5_plus = False
-        assert got_five_plus([2, 3, 4]) is False
+    def test_multiple_small_carries_summing_past_threshold_qualifies(self):
+        # 2 + 3 + 4 = 9 >= 5 -> qualifies, even though no single carry hit 5
+        assert got_five_plus([2, 3, 4]) is True
 
-    def test_sum_would_exceed_but_individual_does_not(self):
-        # [2, 3, 4, 4] sums to 13 (>=5) but no single carry hits 5 -> False
-        assert got_five_plus([2, 3, 4, 4]) is False
+    def test_carries_summing_below_threshold_does_not_qualify(self):
+        # 1 + 1 = 2 < 5 -> does not qualify
+        assert got_five_plus([1, 1]) is False
 
     def test_single_big_carry_qualifies(self):
-        # [2, 6] -> True (one carry of 6)
+        # [2, 6] sums to 8 >= 5 -> qualifies
         assert got_five_plus([2, 6]) is True
 
     def test_exactly_threshold_qualifies(self):
         assert got_five_plus([5]) is True
+
+    def test_just_under_threshold_does_not_qualify(self):
+        assert got_five_plus([4]) is False
 
     def test_empty_list_does_not_qualify(self):
         assert got_five_plus([]) is False
@@ -134,11 +139,18 @@ class TestFivePlusDetection:
         assert got_five_plus([None, 2, None, 6]) is True
         assert got_five_plus([None, None]) is False
 
+    def test_negative_yards_reduce_the_total(self):
+        # a loss on one carry offsets gains on others
+        assert got_five_plus([-2, 6]) is False   # sums to 4
+        assert got_five_plus([-2, 8]) is True    # sums to 6
+
     def test_custom_threshold(self):
-        assert got_five_plus([8, 9], threshold=10) is False
-        assert got_five_plus([8, 11], threshold=10) is True
+        assert got_five_plus([8, 9], threshold=20) is False
+        assert got_five_plus([8, 12], threshold=20) is True
 
     def test_max_carry(self):
+        # max_carry (longest single carry) is a separate diagnostic stat,
+        # unaffected by the target-metric definition.
         assert max_carry([2, 6, -1]) == 6
         assert max_carry([]) is None
 

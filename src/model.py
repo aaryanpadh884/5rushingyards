@@ -95,25 +95,20 @@ def apply_qb_competition_adjustment(p_carry: float, qb_rush_competition: Optiona
     return float(np.clip(p_carry * (1.0 - qb_rush_competition), 0.0, 0.99))
 
 
-def apply_defense_adjustment(p_five_given_carry: float, opp_five_plus_allowed_rate: Optional[float],
-                              league_avg_five_plus_allowed_rate: Optional[float],
-                              max_factor: float = 1.30, min_factor: float = 0.70) -> float:
+def apply_defense_adjustment(p_five_given_carry: float, composite_defense_factor: Optional[float]) -> float:
     """
     Matchup adjustment to P(5+ | carry) (Section 15, 17): scale the
-    player's own conditional rate by how much more/less likely THIS
-    opponent is to allow a 5+ run on the first drive, relative to league
-    average. Capped so a single opponent-sample outlier can't dominate the
-    player's own established skill/role signal.
+    player's own conditional rate by a composite of every first-drive
+    run-defense signal this opponent shows (5+ allowed rate, yards per rush
+    allowed, 10+ allowed rate, success rate allowed, EPA allowed -- see
+    matchup_analysis.compute_composite_defense_factor), not the 5+ allowed
+    rate in isolation. Already capped at the source
+    (config.DEFENSE_ADJUSTMENT_MIN_FACTOR/MAX_FACTOR) so a single opponent
+    outlier can't dominate the player's own established skill/role signal.
     """
-    if (
-        opp_five_plus_allowed_rate is None or pd.isna(opp_five_plus_allowed_rate)
-        or league_avg_five_plus_allowed_rate is None or pd.isna(league_avg_five_plus_allowed_rate)
-        or league_avg_five_plus_allowed_rate == 0
-    ):
+    if composite_defense_factor is None or pd.isna(composite_defense_factor):
         return p_five_given_carry
-    factor = opp_five_plus_allowed_rate / league_avg_five_plus_allowed_rate
-    factor = float(np.clip(factor, min_factor, max_factor))
-    return float(np.clip(p_five_given_carry * factor, 0.01, 0.99))
+    return float(np.clip(p_five_given_carry * composite_defense_factor, 0.01, 0.99))
 
 
 def compute_confidence(games_with_carry: float, role: Optional[str], status: Optional[str],
@@ -215,10 +210,10 @@ def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
         on="team", how="left",
     )
 
-    league_avg_five_allowed = defense_metrics["five_plus_allowed_rate_shrunk"].mean()
     df = df.merge(
         defense_metrics.rename(columns={"team": "opponent"})[
-            ["opponent", "five_plus_allowed_rate_shrunk", "yards_per_rush_allowed", "games"]
+            ["opponent", "five_plus_allowed_rate_shrunk", "yards_per_rush_allowed", "ten_plus_allowed_rate",
+             "success_rate_allowed", "avg_epa_allowed", "composite_defense_factor", "games"]
         ].rename(columns={"games": "opponent_games", "five_plus_allowed_rate_shrunk": "opp_five_plus_allowed_rate"}),
         on="opponent", how="left",
     )
@@ -241,9 +236,7 @@ def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
     )
 
     df["p_five_given_carry_final"] = df.apply(
-        lambda r: apply_defense_adjustment(
-            r["p_five_given_carry_shrunk"], r.get("opp_five_plus_allowed_rate"), league_avg_five_allowed
-        ),
+        lambda r: apply_defense_adjustment(r["p_five_given_carry_shrunk"], r.get("composite_defense_factor")),
         axis=1,
     )
 

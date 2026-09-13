@@ -91,22 +91,28 @@ def renormalize_weights(weights: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Market definition (Sections 7, 34): individual-carry 5+ rule
+# Market definition: total first-drive rushing yards, 5+ rule
+#
+# NOTE: an earlier version of this project used a different rule (true only
+# if a single individual carry reached the threshold). That was changed
+# after confirming the real sportsbook market -- "RB to record 5+ rushing
+# yards on the first drive" -- is an accumulated-total prop, same as any
+# other rushing-yards Over/Under, not a "did he break one big run" prop.
 # ---------------------------------------------------------------------------
 def got_five_plus(rush_yards: Iterable[float], threshold: float = 5.0) -> bool:
     """
-    True if ANY individual rushing attempt in `rush_yards` is >= threshold.
+    True if the SUM of all individual rushing attempts in `rush_yards` is
+    >= threshold -- i.e. the RB's total rushing yards on the first drive.
 
-    This is the exact rule the sportsbook market uses: it is NOT whether the
-    total of all carries sums to >= threshold.
-
-        [2, 3, 4, 4]  -> False (max single carry is 4)
-        [2, 6]        -> True  (one carry of 6)
+        [2, 3, 4, 4]  -> True  (sums to 13 >= 5)
+        [2, 6]        -> True  (sums to 8 >= 5)
+        [1, 1]        -> False (sums to 2 < 5)
+        [-2, 3]       -> False (sums to 1 < 5)
     """
     yards = [y for y in rush_yards if y is not None]
     if not yards:
         return False
-    return max(yards) >= threshold
+    return sum(yards) >= threshold
 
 
 def max_carry(rush_yards: Iterable[float]) -> Optional[float]:
