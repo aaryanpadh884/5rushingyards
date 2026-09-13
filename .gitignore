@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Large downloaded/generated data -- regenerate with `python main.py full-pipeline`
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+.DS_Store
+*.egg-info/
