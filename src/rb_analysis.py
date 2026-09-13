@@ -280,6 +280,62 @@ def blend_seasons(player_season_shrunk: pd.DataFrame, season_weights: Optional[d
     return blended
 
 
+def compute_departed_teammate_boost(rb_metrics: pd.DataFrame, players: pd.DataFrame, max_boost: float) -> pd.DataFrame:
+    """
+    Historical carry rates are earned *while splitting touches with whoever
+    else was on the team at the time*. When a back's historical backfield
+    mate leaves the team (trade, free agency, release) and the back himself
+    stays, that back's true current carry probability is higher than his
+    raw historical rate implies -- the model just has no way to know that
+    from the play-by-play alone, since the pbp only records what happened,
+    not who left.
+
+    This estimates that effect directly from real roster data (the
+    nflverse players roster's `latest_team` field) rather than guessing a
+    number: for a player who is STILL on the same team he accumulated his
+    historical first-drive carries with, we sum the historical carries of
+    any teammates at that same team who have SINCE left (their
+    `latest_team` no longer matches), express that as a fraction of the
+    team's total historical RB carry volume, and cap it
+    (`max_boost`) so a single departure can't dominate the model.
+
+    A player whose OWN latest_team differs from his historical team is
+    excluded entirely -- he changed teams too, so "his teammates left" is
+    not a coherent framing; his historical rate transferring imperfectly to
+    a new team is a separate, documented limitation (see README).
+
+    This must NEVER be used in the backtest: `players.parquet` is a live
+    snapshot taken at run time, so applying "who has left since" to a past
+    season would leak future roster information into a historical
+    prediction. Only the live rankings pipeline should call this.
+    """
+    if "player_id" not in players.columns or "latest_team" not in players.columns:
+        return pd.DataFrame(columns=["team", "player_id", "departed_teammate_boost"])
+
+    current_team_lookup = players.set_index("player_id")["latest_team"]
+
+    rows = []
+    for hist_team, group in rb_metrics.groupby("team"):
+        carries = group.set_index("player_id")["total_carries"].fillna(0)
+        team_total = carries.sum()
+        if team_total <= 0:
+            continue
+        current_team_of = {pid: current_team_lookup.get(pid) for pid in carries.index}
+
+        for pid in carries.index:
+            if current_team_of.get(pid) != hist_team:
+                continue  # this player himself is no longer on this team
+            departed_carries = sum(
+                c for other_pid, c in carries.items()
+                if other_pid != pid and current_team_of.get(other_pid) != hist_team
+            )
+            boost = min(departed_carries / team_total, max_boost)
+            if boost > 0:
+                rows.append({"team": hist_team, "player_id": pid, "departed_teammate_boost": boost})
+
+    return pd.DataFrame(rows, columns=["team", "player_id", "departed_teammate_boost"])
+
+
 def build_rb_metrics(first_drive_plays: pd.DataFrame, players: pd.DataFrame) -> dict:
     """
     Full pipeline entry point for Sections 7-12: returns a dict with the

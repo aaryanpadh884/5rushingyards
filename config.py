@@ -87,6 +87,16 @@ CONFIDENCE_MED_SAMPLE = 8
 QB_RUSH_COMPETITION_MAX_PENALTY = 0.12  # max fractional reduction to carry prob
 
 # ---------------------------------------------------------------------------
+# Departed-teammate boost: when a back's historical backfield competition
+# has since left the team (per the live nflverse roster feed) and the back
+# himself stayed, his carry probability is bumped up by the departed
+# teammates' share of the team's historical RB carry volume, capped here.
+# Live rankings only -- never applied inside the backtest (see
+# rb_analysis.compute_departed_teammate_boost).
+# ---------------------------------------------------------------------------
+DEPARTED_TEAMMATE_MAX_BOOST = 0.30
+
+# ---------------------------------------------------------------------------
 # Role-based multipliers applied to the raw historical carry probability to
 # reflect the CURRENT depth chart (data/current_rb_roles.csv). These are
 # transparent, documented adjustments — not fitted coefficients.

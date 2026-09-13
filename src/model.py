@@ -139,13 +139,20 @@ def compute_confidence(games_with_carry: float, role: Optional[str], status: Opt
 
 def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
                        defense_metrics: pd.DataFrame, qb_competition_by_season: pd.DataFrame,
-                       current_roles: pd.DataFrame, matchups: pd.DataFrame) -> pd.DataFrame:
+                       current_roles: pd.DataFrame, matchups: pd.DataFrame,
+                       players: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     """
     Assemble the final model table: one row per RB with a scheduled
     opponent in `matchups` (columns: team, opponent [, week, game_id]).
 
     This is the function get_weekly_rankings() calls; it does NOT invent
     an opponent for a player if one isn't supplied.
+
+    `players` (optional, the nflverse players roster with a `latest_team`
+    column) enables the departed-teammate carry boost -- pass None to skip
+    it. It must be omitted when this is called from the backtest, since
+    `latest_team` is a live snapshot and using it against a past season
+    would leak future roster information into a historical prediction.
     """
     # Resolve each RB's CURRENT team from the depth-chart file BEFORE joining
     # matchups/team/defense metrics. Historical play-by-play team assignment
@@ -157,6 +164,17 @@ def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
         on="player_id", how="left",
     )
     df["team"] = df["team"].fillna(df["historical_team"])
+
+    if players is not None:
+        from src.rb_analysis import compute_departed_teammate_boost
+        boost_table = compute_departed_teammate_boost(rb_metrics, players, config.DEPARTED_TEAMMATE_MAX_BOOST)
+        df = df.merge(
+            boost_table.rename(columns={"team": "historical_team"}),
+            on=["historical_team", "player_id"], how="left",
+        )
+        df["departed_teammate_boost"] = df["departed_teammate_boost"].fillna(0.0)
+    else:
+        df["departed_teammate_boost"] = 0.0
 
     df = df.merge(matchups, on="team", how="inner")
 
@@ -186,6 +204,10 @@ def build_model_table(rb_metrics: pd.DataFrame, team_metrics: pd.DataFrame,
     role_notes = []
     for _, r in df.iterrows():
         adj, note = apply_role_adjustment(r["p_carry_1plus_shrunk"], r.get("role"), r.get("status"))
+        boost = r.get("departed_teammate_boost", 0.0) or 0.0
+        if boost > 0:
+            adj = float(np.clip(adj * (1 + boost), 0.0, 0.99))
+            note = f"{note}; departed-teammate boost=+{boost:.0%}"
         p_carry_role_adj.append(adj)
         role_notes.append(note)
     df["p_carry_role_adjusted"] = p_carry_role_adj

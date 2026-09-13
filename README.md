@@ -126,6 +126,43 @@ relying on it; this sandbox's outbound network access does not reach
 fantasy/depth-chart sites (ESPN, CBS Sports, RotoWire, etc.) to auto-verify
 beyond the nflverse roster data.
 
+## Departed-teammate carry boost
+
+A back's historical carry rate was earned *while splitting touches with
+whoever else was on the roster at the time*. If that backfield competition
+has since left the team (trade, free agency, release) and the back himself
+stayed, his real current carry probability is higher than his raw
+historical rate implies -- the play-by-play alone has no way to know that.
+
+The model corrects for this using the live nflverse players roster's
+`latest_team` field: for any RB who is still on the same team he
+accumulated his historical first-drive carries with, it sums the
+historical carries of any teammates at that team who have since left,
+expresses that as a fraction of the team's historical RB carry volume, and
+applies it as a capped boost (`config.DEPARTED_TEAMMATE_MAX_BOOST`, default
+30%) to his carry probability. It shows up transparently in the `role_note`
+column (e.g. `"departed-teammate boost=+30%"`).
+
+Example: Jahmyr Gibbs shared Detroit's backfield with David Montgomery in
+2024-2025 (Montgomery took ~42% of DET's RB carries). Montgomery has since
+signed with Houston; Gibbs remains DET's RB1. Without this adjustment,
+Gibbs' carry probability is still implicitly priced as if that competition
+exists. With it, his P(carry) is boosted from the raw ~60% up to ~86% (the
+30% cap binds here), which moves his overall model probability from ~46%
+to ~60%.
+
+This is **live-rankings only** -- it is never applied inside the backtest.
+`latest_team` is a snapshot taken at run time, so using "who has left
+since" against a past season would leak future roster information into a
+historical prediction (confirmed: backtest metrics are identical with and
+without this feature wired in, since `run_backtest` never passes `players`
+into `build_model_table`).
+
+It also only fires when the RB himself didn't change teams -- a player who
+was traded inherits a *new* team's committee dynamics that his own
+historical rate says nothing about; that mismatch is a separate, documented
+limitation, not something this boost tries to fix.
+
 ## Adding sportsbook odds
 
 `data/sportsbook_odds.csv` (columns: `player_name,team,market,line,american_odds,sportsbook,timestamp`).

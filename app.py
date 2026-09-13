@@ -15,6 +15,7 @@ import plotly.express as px
 import streamlit as st
 
 import config
+from src.data_loader import load_player_positions
 from src.model import load_current_rb_roles
 from src.odds import load_sportsbook_odds
 from src.rankings import rank_candidates, filter_rankings
@@ -56,8 +57,9 @@ def page_rankings():
 
     current_roles = load_current_rb_roles()
     odds = load_sportsbook_odds()
+    players = load_player_positions()
 
-    model_df = build_model_table(rb_metrics, team_metrics, defense_metrics, qb_competition, current_roles, matchups)
+    model_df = build_model_table(rb_metrics, team_metrics, defense_metrics, qb_competition, current_roles, matchups, players=players)
     with_odds = attach_odds_and_edge(model_df, odds)
     ranked = rank_candidates(with_odds)
 

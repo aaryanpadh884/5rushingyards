@@ -112,8 +112,9 @@ def cmd_rankings(args):
     matchups = pd.read_csv(config.WEEK1_MATCHUPS_FILE)
 
     odds = load_sportsbook_odds()
+    players = load_player_positions()
 
-    model_df = build_model_table(rb_metrics, team_metrics, defense_metrics, qb_competition, current_roles, matchups)
+    model_df = build_model_table(rb_metrics, team_metrics, defense_metrics, qb_competition, current_roles, matchups, players=players)
     with_odds = attach_odds_and_edge(model_df, odds)
     ranked = rank_candidates(with_odds)
     ranked.to_csv(config.RANKINGS_OUT, index=False)
